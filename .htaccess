@@ -1,0 +1,67 @@
+# Enable Rewrite Engine
+RewriteEngine On
+RewriteBase /
+
+# Correct MIME types (must be before rewrite rules)
+AddType application/javascript .js
+AddType application/javascript .mjs
+AddType text/css .css
+AddType application/json .json
+
+# Force canonical host: breccia-eg.com (redirect www and any other host)
+RewriteCond %{HTTP_HOST} !^breccia-eg\.com$ [NC]
+RewriteRule ^(.*)$ https://breccia-eg.com/$1 [L,R=301]
+
+# Force HTTPS (if somehow still on http)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# IMPORTANT: Serve actual files first with correct MIME types
+# This prevents assets from being served as HTML when they don't exist
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Serve directories if they exist
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+ 
+# Add trailing slash for directory-like routes (skip files and root)
+# - Skip if the request has a dot (likely a file) or already ends with /
+# - Skip if query string present (avoid breaking parameterized URLs)
+RewriteCond %{REQUEST_URI} !\.[^./]+$ 
+RewriteCond %{REQUEST_URI} !/$
+RewriteCond %{REQUEST_URI} !^/$
+RewriteCond %{QUERY_STRING} ^$ 
+RewriteRule ^(.+)$ /$1/ [L,R=301]
+
+# Finally, serve index.html for SPA routes (only if file doesn't exist)
+RewriteRule ^ /index.html [L]
+
+# Enable compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/plain text/html text/xml text/css application/javascript application/json
+</IfModule>
+
+# Cache
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/pdf "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType application/x-javascript "access plus 1 month"
+  ExpiresByType application/x-shockwave-flash "access plus 1 month"
+  ExpiresDefault "access plus 2 days"
+</IfModule>
+
+Options -Indexes
+
+<Files .htaccess>
+  Order allow,deny
+  Deny from all
+</Files>
+
+ErrorDocument 404 /index.html
