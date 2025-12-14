@@ -96,6 +96,7 @@ const Admin = () => {
     image_url_5: "",
     size_chart_slug: "",
     discount_percentage: "",
+    available_sizes: [] as string[],
   });
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
@@ -127,8 +128,10 @@ const Admin = () => {
       image_url_3: p.image_url_3 ?? "",
       image_url_4: p.image_url_4 ?? "",
       image_url_5: p.image_url_5 ?? "",
+
       size_chart_slug: p.size_chart_slug ?? "",
       discount_percentage: p.discount_percentage != null ? String(p.discount_percentage) : "",
+      available_sizes: Array.isArray(p.available_sizes) ? p.available_sizes.filter(Boolean) as string[] : [],
     });
     setEditingProductId(p.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -136,7 +139,7 @@ const Admin = () => {
 
   const cancelEdit = () => {
     setEditingProductId(null);
-    setForm({ name: "", price: "", category: "", fit: "", style: "", product_color: "", colors: [], in_stock: 'in', description: "", image_url: "", image_url_2: "", image_url_3: "", image_url_4: "", image_url_5: "", size_chart_slug: "", discount_percentage: "" });
+    setForm({ name: "", price: "", category: "", fit: "", style: "", product_color: "", colors: [], in_stock: 'in', description: "", image_url: "", image_url_2: "", image_url_3: "", image_url_4: "", image_url_5: "", size_chart_slug: "", discount_percentage: "", available_sizes: [] });
   };
 
   useEffect(() => {
@@ -239,6 +242,7 @@ const Admin = () => {
         image_url_5: form.image_url_5 || null,
         size_chart_slug: form.size_chart_slug || null,
         discount_percentage: form.discount_percentage !== "" ? Number(form.discount_percentage) : null,
+        available_sizes: form.available_sizes && form.available_sizes.length ? form.available_sizes : null,
       });
       ok = resUp.ok; err = resUp.error;
     } else {
@@ -259,6 +263,7 @@ const Admin = () => {
         image_url_5: form.image_url_5 || undefined,
         size_chart_slug: form.size_chart_slug || undefined,
         discount_percentage: form.discount_percentage !== "" ? Number(form.discount_percentage) : undefined,
+        available_sizes: form.available_sizes && form.available_sizes.length ? form.available_sizes : undefined,
       });
       ok = res.ok; err = res.error;
     }
@@ -297,27 +302,27 @@ const Admin = () => {
 
   const handleStatusUpdate = async (orderId: string, newStatus: 'requested' | 'ready_to_ship' | 'shipped' | 'delivered') => {
     const prevStatus = orders.find(o => o.id === orderId)?.status;
-    
+
     // Optimistic UI update
-    setOrders(prev => prev.map(order => 
+    setOrders(prev => prev.map(order =>
       order.id === orderId ? { ...order, status: newStatus } : order
     ));
 
     const res = await updateOrderStatus(orderId, newStatus);
     if (!res.ok) {
       // Revert on failure
-      setOrders(prev => prev.map(order => 
+      setOrders(prev => prev.map(order =>
         order.id === orderId ? { ...order, status: prevStatus } : order
       ));
-      toast({ 
-        title: "Update failed", 
-        description: res.error, 
-        variant: "destructive" 
+      toast({
+        title: "Update failed",
+        description: res.error,
+        variant: "destructive"
       });
     } else {
-      toast({ 
-        title: "Status updated", 
-        description: `Order status changed to ${newStatus}` 
+      toast({
+        title: "Status updated",
+        description: `Order status changed to ${newStatus}`
       });
     }
   };
@@ -340,7 +345,7 @@ const Admin = () => {
   const handleDeleteSizeChart = async (sizeChart: SizeChart) => {
     // Check if any products are using this size chart
     const dependentProducts = await fetchProductsWithSizeChart(sizeChart.slug);
-    
+
     if (dependentProducts.length > 0) {
       const productNames = dependentProducts.map(p => p.name).join(', ');
       toast({
@@ -362,7 +367,7 @@ const Admin = () => {
     }
 
     toast({ title: "Size chart deleted", description: `${sizeChart.title} has been deleted.` });
-    
+
     // Refresh size charts list
     setSizeChartsLoading(true);
     const charts = await fetchSizeCharts();
@@ -631,15 +636,41 @@ const Admin = () => {
                               return { ...f, colors: next };
                             });
                           }}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs ${
-                            selected ? "border-accent bg-accent/10" : "border-border bg-background"
-                          }`}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs ${selected ? "border-accent bg-accent/10" : "border-border bg-background"
+                            }`}
                         >
                           <span
                             className="w-4 h-4 rounded-full border border-border"
                             style={{ backgroundColor: colorToCss(color) }}
                           />
                           <span>{color}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <Label>Available Sizes</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {["S", "M", "L", "XL", "XXL", "XXXL"].map((size) => {
+                      const selected = form.available_sizes.includes(size);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => {
+                            setForm((f) => {
+                              const exists = f.available_sizes.includes(size);
+                              const next = exists
+                                ? f.available_sizes.filter((s) => s !== size)
+                                : [...f.available_sizes, size];
+                              return { ...f, available_sizes: next };
+                            });
+                          }}
+                          className={`inline-flex items-center justify-center h-9 min-w-[36px] px-2 rounded-md border text-sm font-medium transition-colors ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent hover:text-accent-foreground"
+                            }`}
+                        >
+                          {size}
                         </button>
                       );
                     })}
@@ -753,37 +784,37 @@ const Admin = () => {
             {/* Category Management */}
             <div className="bg-card border border-border p-4 sm:p-6 rounded-lg">
               <h2 className="text-xl sm:text-2xl font-bold mb-4">Category Management</h2>
-              
+
               {/* Add Category Form */}
               <form onSubmit={handleCategorySubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <div>
                   <Label htmlFor="category-name">Category Name</Label>
-                  <Input 
-                    id="category-name" 
-                    name="name" 
-                    value={categoryForm.name} 
-                    onChange={handleCategoryChange} 
-                    placeholder="e.g., Hoodies" 
+                  <Input
+                    id="category-name"
+                    name="name"
+                    value={categoryForm.name}
+                    onChange={handleCategoryChange}
+                    placeholder="e.g., Hoodies"
                   />
                 </div>
                 <div>
                   <Label htmlFor="category-slug">Slug</Label>
-                  <Input 
-                    id="category-slug" 
-                    name="slug" 
-                    value={categoryForm.slug} 
-                    onChange={handleCategoryChange} 
-                    placeholder="e.g., hoodies" 
+                  <Input
+                    id="category-slug"
+                    name="slug"
+                    value={categoryForm.slug}
+                    onChange={handleCategoryChange}
+                    placeholder="e.g., hoodies"
                   />
                 </div>
                 <div>
                   <Label htmlFor="category-image">Image URL</Label>
-                  <Input 
-                    id="category-image" 
-                    name="image_url" 
-                    value={categoryForm.image_url} 
-                    onChange={handleCategoryChange} 
-                    placeholder="https://..." 
+                  <Input
+                    id="category-image"
+                    name="image_url"
+                    value={categoryForm.image_url}
+                    onChange={handleCategoryChange}
+                    placeholder="https://..."
                   />
                 </div>
                 <div className="md:col-span-3 flex justify-end">
@@ -805,10 +836,10 @@ const Admin = () => {
                     {categories.map((category) => (
                       <div key={category.id} className="border border-border p-4 rounded-lg bg-background">
                         <div className="aspect-[4/3] mb-3 overflow-hidden bg-muted rounded">
-                          <img 
-                            src={category.image_url} 
-                            alt={category.name} 
-                            className="w-full h-full object-cover" 
+                          <img
+                            src={category.image_url}
+                            alt={category.name}
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="space-y-3">
@@ -1079,7 +1110,7 @@ const Admin = () => {
           </div>
         )}
 
-        
+
       </div>
     </main>
   );

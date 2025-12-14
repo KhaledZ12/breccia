@@ -20,13 +20,14 @@ export type Product = {
   colors?: string[] | null;
   product_color?: string | null;
   discount_percentage?: number | null;
+  available_sizes?: string[] | null;
 };
 
 export async function fetchProducts(): Promise<Product[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("products")
-    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage")
+    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage, available_sizes")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -40,7 +41,7 @@ export async function fetchProductsWithSizeChart(sizeChartSlug: string): Promise
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("products")
-    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage")
+    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage, available_sizes")
     .eq("size_chart_slug", sizeChartSlug);
   if (error) {
     console.error("Failed to fetch products with size chart:", error.message);
@@ -53,7 +54,7 @@ export async function fetchFeaturedProducts(limit = 4): Promise<Product[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("products")
-    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage")
+    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage, available_sizes")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -68,7 +69,7 @@ export async function fetchProductById(id: string): Promise<Product | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("products")
-    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage")
+    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage, available_sizes")
     .eq("id", id)
     .maybeSingle();
 
@@ -96,6 +97,7 @@ export async function createProduct(input: {
   colors?: string[];
   in_stock?: boolean;
   discount_percentage?: number;
+  available_sizes?: string[];
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const payload: Record<string, unknown> = {
     name: input.name,
@@ -115,6 +117,7 @@ export async function createProduct(input: {
   if (input.style) payload.style = input.style;
   if (input.product_color) payload.product_color = input.product_color;
   if (input.colors && input.colors.length > 0) payload.colors = input.colors;
+  if (input.available_sizes && input.available_sizes.length > 0) payload.available_sizes = input.available_sizes;
   if (typeof input.in_stock === 'boolean') payload.in_stock = input.in_stock;
   if (typeof input.discount_percentage === 'number') payload.discount_percentage = input.discount_percentage;
 
@@ -146,6 +149,7 @@ export async function updateProduct(id: string, updates: {
   product_color?: string | null;
   in_stock?: boolean | null;
   discount_percentage?: number | null;
+  available_sizes?: string[] | null;
 }): Promise<{ ok: boolean; error?: string }> {
   const payload: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(updates)) {
@@ -180,7 +184,7 @@ export async function findProductVariant(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from("products")
-    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage")
+    .select("id, name, price, image_url, image_url_2, image_url_3, image_url_4, image_url_5, category, description, in_stock, slug, size_chart_slug, fit, style, colors, product_color, created_at, discount_percentage, available_sizes")
     .eq("category", params.category)
     .eq("product_color", params.product_color);
 
@@ -198,4 +202,32 @@ export async function findProductVariant(params: {
     return null;
   }
   return data ?? null;
+}
+
+export async function fetchAvailableFits(params: {
+  name: string;
+  product_color?: string | null;
+}): Promise<{ id: string; fit: string }[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("products")
+    .select("id, fit")
+    .ilike("name", params.name) // Case insensitive match
+    .not("fit", "is", null);
+
+  if (params.product_color) {
+    query = query.eq("product_color", params.product_color);
+  } else {
+    // If no color specified, match products with no color (null)
+    query = query.is("product_color", null);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Failed to fetch available fits:", error.message);
+    return [];
+  }
+
+  return data ?? [];
 }
