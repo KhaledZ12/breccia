@@ -17,7 +17,7 @@ export const STATIC_FILTERS: StaticFilter[] = [
     id: "size",
     name: "Size",
     type: "size",
-    values: ["XS", "S", "M", "L", "XL"],
+    values: ["S", "M", "L", "XL", "XXL", "XXXL"],
   },
   {
     id: "fit",

@@ -85,6 +85,8 @@ const CollectionPage = () => {
   const [selectedFitOptions, setSelectedFitOptions] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedColorOptions, setSelectedColorOptions] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedSizeOptions, setSelectedSizeOptions] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -132,11 +134,11 @@ const CollectionPage = () => {
     return STATIC_FILTERS.map((filter) =>
       filter.id === "color"
         ? {
-            ...filter,
-            values: filter.values.filter((value: string) =>
-              availableColorSlugs.has(slug(value))
-            ),
-          }
+          ...filter,
+          values: filter.values.filter((value: string) =>
+            availableColorSlugs.has(slug(value))
+          ),
+        }
         : filter
     );
   }, [products]);
@@ -147,8 +149,9 @@ const CollectionPage = () => {
       priceRange: JSON.stringify(priceRange),
       selectedFits: JSON.stringify(selectedFits),
       selectedColors: JSON.stringify(selectedColors),
+      selectedSizes: JSON.stringify(selectedSizes),
     }),
-    [selectedCategories, priceRange, selectedFits, selectedColors]
+    [selectedCategories, priceRange, selectedFits, selectedColors, selectedSizes]
   );
 
   useEffect(() => {
@@ -278,17 +281,31 @@ const CollectionPage = () => {
                           </div>
                         ) : filter.type === "size" ? (
                           <div className="grid grid-cols-3 gap-2">
-                            {filter.values.map((value: string) => (
-                              <div key={value} className="flex items-center space-x-1">
-                                <Checkbox id={`${filter.id}-${value}`} />
-                                <Label
-                                  htmlFor={`${filter.id}-${value}`}
-                                  className="text-xs cursor-pointer"
-                                >
-                                  {value}
-                                </Label>
-                              </div>
-                            ))}
+                            {filter.values.map((value: string) => {
+                              const checked = selectedSizeOptions.includes(value);
+                              return (
+                                <div key={value} className="flex items-center space-x-1">
+                                  <Checkbox
+                                    id={`${filter.id}-${value}`}
+                                    checked={checked}
+                                    onCheckedChange={(v) => {
+                                      setSelectedSizeOptions((prev) => {
+                                        const next = new Set(prev);
+                                        if (v) next.add(value);
+                                        else next.delete(value);
+                                        return Array.from(next);
+                                      });
+                                    }}
+                                  />
+                                  <Label
+                                    htmlFor={`${filter.id}-${value}`}
+                                    className="text-xs cursor-pointer"
+                                  >
+                                    {value}
+                                  </Label>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -344,6 +361,7 @@ const CollectionPage = () => {
                       setSelectedCategories(normalized);
                       setSelectedFits(selectedFitOptions);
                       setSelectedColors(selectedColorOptions);
+                      setSelectedSizes(selectedSizeOptions);
                       setPriceRange(uiPriceRange as [number, number]);
                       setShowFilters(false);
                     }}
@@ -359,9 +377,9 @@ const CollectionPage = () => {
                   const byCollection = baseCollectionProducts;
                   const byCategory = selectedCategories.length
                     ? byCollection.filter((p) => {
-                        const catSlug = toSlug(p.category || "");
-                        return selectedCategories.includes(catSlug);
-                      })
+                      const catSlug = toSlug(p.category || "");
+                      return selectedCategories.includes(catSlug);
+                    })
                     : byCollection;
                   const byPrice = byCategory.filter((p) => {
                     const d = Math.max(
@@ -375,24 +393,31 @@ const CollectionPage = () => {
                   });
                   const byFit = selectedFits.length
                     ? byPrice.filter((p) => {
-                        let fit = p.fit ? toSlug(String(p.fit)) : "";
-                        if (/^over-?size(d)?$/.test(fit)) fit = "oversized";
-                        return selectedFits.includes(fit);
-                      })
+                      let fit = p.fit ? toSlug(String(p.fit)) : "";
+                      if (/^over-?size(d)?$/.test(fit)) fit = "oversized";
+                      return selectedFits.includes(fit);
+                    })
                     : byPrice;
                   const byColor = selectedColors.length
                     ? byFit.filter((p) => {
-                        const primaryColorSlug = p.product_color
-                          ? toSlug(String(p.product_color))
-                          : "";
-                        return primaryColorSlug
-                          ? selectedColors.includes(primaryColorSlug)
-                          : false;
-                      })
+                      const primaryColorSlug = p.product_color
+                        ? toSlug(String(p.product_color))
+                        : "";
+                      return primaryColorSlug
+                        ? selectedColors.includes(primaryColorSlug)
+                        : false;
+                    })
                     : byFit;
 
+                  const bySize = selectedSizes.length
+                    ? byColor.filter((p) => { // Check if product has available_sizes and if any match
+                      if (!p.available_sizes || p.available_sizes.length === 0) return false;
+                      return p.available_sizes.some((s) => selectedSizes.includes(s));
+                    })
+                    : byColor;
+
                   // Show every product after filters; do not group designs by category/fit/style
-                  const filtered: ProductType[] = byColor;
+                  const filtered: ProductType[] = bySize;
 
                   if (filtered.length === 0) {
                     return (
